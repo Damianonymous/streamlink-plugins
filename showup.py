@@ -31,13 +31,28 @@ class ShowUp(Plugin):
         ws.send(JSON_CHANNEL % channel)
         # STREAM_ID
         result = ws.recv()
-        # RTMP CDN
-        result_2 = ws.recv()
-        ws.close()
         data = utils.parse_json(result, schema=_schema)
         log.debug('DATA 1 {0}'.format(data))
+        if 'failure' in data:
+            ws.close()
+            return False, False
+
+        # RTMP CDN
+        result_2 = ws.recv()
         data2 = utils.parse_json(result_2, schema=_schema)
         log.debug('DATA 2 {0}'.format(data2))
+        if 'failure' in data2:
+            ws.close()
+            return False, False
+
+        # ERROR
+        result_3 = ws.recv()
+        data3 = utils.parse_json(result_3, schema=_schema)
+        log.debug('DATA 3 {0}'.format(data3))
+        if 'failure' in data3:
+            ws.close()
+            return False, False
+
         return data[0], data2[1]
 
     def _get_websocket(self, html):
@@ -55,6 +70,9 @@ class ShowUp(Plugin):
         ws_url = self._get_websocket(page.text)
         log.debug('WebSocket: {0}'.format(ws_url))
         stream_id, rtmp_cdn = self._get_stream_id(channel, ws_url)
+        if not (stream_id or rtmp_cdn):
+            log.error('Channel is not available.')
+            return
         log.debug('Stream ID: {0}'.format(stream_id))
         log.debug('RTMP CDN: {0}'.format(rtmp_cdn))
         stream = RTMPStream(self.session, {
@@ -68,5 +86,3 @@ class ShowUp(Plugin):
 
 
 __plugin__ = ShowUp
- 
-   
