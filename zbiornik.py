@@ -2,7 +2,7 @@ import logging
 import re
 
 from streamlink.plugin import Plugin
-from streamlink.plugin.api import http, useragents, validate
+from streamlink.plugin.api import useragents, validate
 from streamlink.stream import RTMPStream
 from streamlink.utils import parse_json
 
@@ -37,11 +37,14 @@ class Zbiornik(Plugin):
         return cls._url_re.match(url) is not None
 
     def _get_streams(self):
+        log.debug('Version 2018-07-12')
+        log.info('This is a custom plugin. '
+                 'For support visit https://github.com/back-to/plugins')
         channel = self._url_re.match(self.url).group('channel')
         log.info('Channel: {0}'.format(channel))
-        http.headers.update({'User-Agent': useragents.FIREFOX})
-        http.parse_cookies('adult=1')
-        res = http.get(self.url)
+        self.session.http.headers.update({'User-Agent': useragents.FIREFOX})
+        self.session.http.parse_cookies('adult=1')
+        res = self.session.http.get(self.url)
 
         m = self._streams_re.search(res.text)
         if not m:
