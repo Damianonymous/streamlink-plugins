@@ -13,7 +13,7 @@ JSON_UID = u'{"id":0,"value":["%s",""]}'
 JSON_CHANNEL = u'{"id":2,"value":["%s"]}'
 
 _url_re = re.compile(r'https?://(\w+.)?showup\.tv/(?P<channel>[A-Za-z0-9_-]+)')
-_websocket_url_re = re.compile(r'''startChildBug\(.*'(?P<ws>[\w.]+:\d+)'\);''')
+_websocket_url_re = re.compile(r'''socket\.connect\(["'](?P<ws>[^"']+)["']\)''')
 _schema = validate.Schema(validate.get('value'))
 
 log = logging.getLogger(__name__)
@@ -61,9 +61,8 @@ class ShowUp(Plugin):
             return 'ws://%s' % ws_url.group("ws")
 
     def _get_streams(self):
-        log.debug('Version 2018-07-12')
-        log.info('This is a custom plugin. '
-                 'For support visit https://github.com/back-to/plugins')
+        log.debug('Version 2018-08-14')
+        log.info('This is a custom plugin.')
         url_match = _url_re.match(self.url)
         channel = url_match.group('channel')
         log.debug('Channel name: {0}'.format(channel))
