@@ -1,15 +1,14 @@
-import json
 import logging
 import random
 import re
 import uuid
 
 from streamlink.compat import unquote
-from streamlink.exceptions import NoStreamsError
-from streamlink.plugin import Plugin
-from streamlink.plugin.api import http
-from streamlink.plugin.api import useragents
-from streamlink.stream import HLSStream
+from streamlink.exceptions import NoStreamsError, PluginError
+from streamlink.plugin import Plugin, PluginArgument, PluginArguments
+from streamlink.plugin.api import useragents, validate
+from streamlink.stream import DASHStream, HLSStream
+from streamlink.utils import parse_json
 
 from websocket import create_connection
 
@@ -17,7 +16,7 @@ log = logging.getLogger(__name__)
 
 
 class MyFreeCams(Plugin):
-    '''streamlink Plugin for MyFreeCams
+    '''Streamlink Plugin for MyFreeCams
 
     UserName
         - https://m.myfreecams.com/models/UserName
@@ -29,17 +28,47 @@ class MyFreeCams(Plugin):
         - https://myfreecams.com/?id=10101010
     '''
 
-    HLS_VIDEO_URL = 'http://{0}.myfreecams.com:1935/NxServer/ngrp:mfc_{1}.f4v_mobile/playlist.m3u8'
     JS_SERVER_URL = 'https://www.myfreecams.com/_js/serverconfig.js'
     PHP_URL = 'https://www.myfreecams.com/php/FcwExtResp.php?respkey={respkey}&type={type}&opts={opts}&serv={serv}'
 
-    _url_re = re.compile(r'''https?://(?:\w+\.)?myfreecams\.com/(?:(?:models/)?#?(?P<username>\w+)|\?id=(?P<user_id>\d+))''')
+    _url_re = re.compile(r'''https?://(?:\w+\.)?myfreecams\.com/
+        (?:
+            (?:models/)?\#?(?P<username>\w+)
+            |
+            \?id=(?P<user_id>\d+)
+        )''', re.VERBOSE)
     _dict_re = re.compile(r'''(?P<data>{.*})''')
     _socket_re = re.compile(r'''(\w+) (\w+) (\w+) (\w+) (\w+)''')
 
+    _data_schema = validate.Schema(
+        {
+            'nm': validate.text,
+            'sid': int,
+            'uid': int,
+            'vs': int,
+            validate.optional('u'): {
+                'camserv': int
+            }
+        }
+    )
+
+    arguments = PluginArguments(
+        PluginArgument(
+            'dash',
+            action='store_true',
+            default=False,
+            help='''
+            Use DASH streams as an alternative source.
+
+                %(prog)s --myfreecams-dash <url> [stream]
+
+            '''
+        )
+    )
+
     @classmethod
     def can_handle_url(cls, url):
-        return cls._url_re.match(url)
+        return cls._url_re.match(url) is not None
 
     def _php_fallback(self, username, user_id, php_message):
         '''Use the php website as a fallback when
@@ -54,12 +83,12 @@ class MyFreeCams(Plugin):
         Returns:
             message: data to create a video url.
         '''
-        log.debug('Trying to use php fallback')
+        log.debug('Attempting to use php fallback')
         php_data = self._dict_re.search(php_message)
         if php_data is None:
             raise NoStreamsError(self.url)
 
-        php_data = json.loads(php_data.group('data'))
+        php_data = parse_json(php_data.group('data'))
         php_url = self.PHP_URL.format(
             opts=php_data['opts'],
             respkey=php_data['respkey'],
@@ -70,7 +99,7 @@ class MyFreeCams(Plugin):
             'cid': 3149,
             'gw': 1
         }
-        res = http.get(php_url, params=php_params)
+        res = self.session.http.get(php_url, params=php_params)
 
         if username:
             _username_php_re = str(username)
@@ -112,7 +141,7 @@ class MyFreeCams(Plugin):
             php_message: data for self._php_fallback
         '''
         try_to_connect = 0
-        while (try_to_connect < 3):
+        while (try_to_connect < 5):
             try:
                 xchat = str(random.choice(chat_servers))
                 host = 'wss://{0}.myfreecams.com/fcsl'.format(xchat)
@@ -121,9 +150,9 @@ class MyFreeCams(Plugin):
                 r_id = str(uuid.uuid4().hex[0:32])
                 ws.send('1 0 0 20071025 0 {0}@guest:guest\n'.format(r_id))
                 log.debug('Websocket server {0} connected'.format(xchat))
-                try_to_connect = 3
+                try_to_connect = 5
             except Exception:
-                try_to_connect = try_to_connect + 1
+                try_to_connect += 1
                 log.debug('Failed to connect to WS server: {0} - try {1}'.format(xchat, try_to_connect))
                 if try_to_connect == 5:
                     log.error('can\'t connect to the websocket')
@@ -172,74 +201,116 @@ class MyFreeCams(Plugin):
         return message, php_message
 
     def _get_servers(self):
-        '''Gets all servers.'''
-        res = http.get(self.JS_SERVER_URL)
-        servers = json.loads(res.text)
+        res = self.session.http.get(self.JS_SERVER_URL)
+        servers = parse_json(res.text)
+        return servers
 
-        chat_servers = servers.get('chat_servers')
-        h5video_servers = servers.get('h5video_servers')
+    def _get_camserver(self, servers, key):
+        server_type = None
+        value = None
 
-        return chat_servers, h5video_servers
+        h5video_servers = servers['h5video_servers']
+        ngvideo_servers = servers['ngvideo_servers']
+        wzobs_servers = servers['wzobs_servers']
+
+        if h5video_servers.get(str(key)):
+            value = h5video_servers[str(key)]
+            server_type = 'h5video_servers'
+        elif wzobs_servers.get(str(key)):
+            value = wzobs_servers[str(key)]
+            server_type = 'wzobs_servers'
+        elif ngvideo_servers.get(str(key)):
+            value = ngvideo_servers[str(key)]
+            server_type = 'ngvideo_servers'
+
+        return value, server_type
 
     def _get_streams(self):
-        http.headers.update({'User-Agent': useragents.FIREFOX})
+        self.session.http.headers.update({'User-Agent': useragents.FIREFOX})
+        log.debug('Version 2018-07-12')
         log.info('This is a custom plugin. '
                  'For support visit https://github.com/back-to/plugins')
         match = self._url_re.match(self.url)
         username = match.group('username')
         user_id = match.group('user_id')
 
-        chat_servers, video_servers = self._get_servers()
+        servers = self._get_servers()
+        chat_servers = servers['chat_servers']
 
         message, php_message = self._websocket_data(username, chat_servers)
 
         if user_id and not username:
             data = self._php_fallback(username, user_id, php_message)
         else:
-            log.debug('Trying to use WebSocket data')
+            log.debug('Attempting to use WebSocket data')
             data = self._dict_re.search(message)
             if data is None:
                 raise NoStreamsError(self.url)
-            data = json.loads(data.group('data'))
+            data = parse_json(data.group('data'), schema=self._data_schema)
 
-        vs = data.get('vs')
+        vs = data['vs']
         ok_vs = [0, 90]
         if vs not in ok_vs:
-            if vs is 2:
+            if vs == 2:
                 log.info('Model is currently away')
-            elif vs is 12:
+            elif vs == 12:
                 log.info('Model is currently in a private show')
-            elif vs is 13:
+            elif vs == 13:
                 log.info('Model is currently in a group show')
-            elif vs is 127:
+            elif vs == 127:
                 log.info('Model is currently offline')
             else:
                 log.error('Stream status: {0}'.format(vs))
             raise NoStreamsError(self.url)
 
-        nm = data.get('nm')
-        uid = data.get('uid')
+        log.debug('VS: {0}'.format(vs))
+
+        nm = data['nm']
+        uid = data['uid']
         uid_video = uid + 100000000
         camserver = data['u']['camserv']
-        server = video_servers.get(str(camserver))
+
+        server, server_type = self._get_camserver(servers, camserver)
 
         if server is None and not user_id:
             fallback_data = self._php_fallback(username, user_id, php_message)
             camserver = fallback_data['u']['camserv']
-            server = video_servers.get(str(camserver))
+            server, server_type = self._get_camserver(servers, camserver)
 
         log.info('Username: {0}'.format(nm))
         log.info('User ID:  {0}'.format(uid))
+
+        if not server:
+            raise PluginError('Missing video server')
+
         log.debug('Video server: {0}'.format(server))
-        if server:
-            hls_url = self.HLS_VIDEO_URL.format(server, uid_video)
-            log.debug('HLS URL: {0}'.format(hls_url))
-            for s in HLSStream.parse_variant_playlist(self.session, hls_url).items():
+        log.debug('Video server_type: {0}'.format(server_type))
+
+        if server_type == 'h5video_servers':
+            DASH_VIDEO_URL = 'https://{0}.myfreecams.com/NxServer/ngrp:mfc_{1}.f4v_desktop/manifest.mpd'.format(server, uid_video)
+            HLS_VIDEO_URL = 'https://{0}.myfreecams.com/NxServer/ngrp:mfc_{1}.f4v_mobile/playlist.m3u8'.format(server, uid_video)
+        elif server_type == 'wzobs_servers':
+            DASH_VIDEO_URL = ''
+            HLS_VIDEO_URL = 'https://{0}.myfreecams.com/NxServer/ngrp:mfc_a_{1}.f4v_mobile/playlist.m3u8'.format(server, uid_video)
+        elif server_type == 'ngvideo_servers':
+            raise PluginError('ngvideo_servers are not supported.')
+        else:
+            raise PluginError('Unknow server type.')
+
+        log.debug('HLS URL: {0}'.format(HLS_VIDEO_URL))
+        for s in HLSStream.parse_variant_playlist(self.session,
+                                                  HLS_VIDEO_URL).items():
+            yield s
+
+        if DASH_VIDEO_URL and self.get_option('dash'):
+            log.debug('DASH URL: {0}'.format(DASH_VIDEO_URL))
+            for s in DASHStream.parse_manifest(self.session,
+                                               DASH_VIDEO_URL).items():
                 yield s
 
 
 __plugin__ = MyFreeCams
 
-   
+
         
         
