@@ -4,7 +4,7 @@ import re
 import websocket
 
 from streamlink.plugin import Plugin
-from streamlink.plugin.api import http, validate, utils
+from streamlink.plugin.api import validate, utils
 from streamlink.stream import RTMPStream
 
 SWF_URL = 'http://showup.tv/flash/suStreamer.swf'
@@ -13,7 +13,7 @@ JSON_UID = u'{"id":0,"value":["%s",""]}'
 JSON_CHANNEL = u'{"id":2,"value":["%s"]}'
 
 _url_re = re.compile(r'https?://(\w+.)?showup\.tv/(?P<channel>[A-Za-z0-9_-]+)')
-_websocket_url_re = re.compile(r'''startChildBug\(.*'(?P<ws>[\w.]+:\d+)'\);''')
+_websocket_url_re = re.compile(r'''socket\.connect\(["'](?P<ws>[^"']+)["']\)''')
 _schema = validate.Schema(validate.get('value'))
 
 log = logging.getLogger(__name__)
@@ -61,12 +61,14 @@ class ShowUp(Plugin):
             return 'ws://%s' % ws_url.group("ws")
 
     def _get_streams(self):
+        log.debug('Version 2018-08-14')
+        log.info('This is a custom plugin.')
         url_match = _url_re.match(self.url)
         channel = url_match.group('channel')
         log.debug('Channel name: {0}'.format(channel))
-        http.parse_headers('Referer: %s' % self.url)
-        http.parse_cookies('accept_rules=true')
-        page = http.get(self.url)
+        self.session.http.parse_headers('Referer: %s' % self.url)
+        self.session.http.parse_cookies('accept_rules=true')
+        page = self.session.http.get(self.url)
         ws_url = self._get_websocket(page.text)
         log.debug('WebSocket: {0}'.format(ws_url))
         stream_id, rtmp_cdn = self._get_stream_id(channel, ws_url)
