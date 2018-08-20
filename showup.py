@@ -58,11 +58,13 @@ class ShowUp(Plugin):
     def _get_websocket(self, html):
         ws_url = _websocket_url_re.search(html)
         if ws_url:
-            return 'ws://%s' % ws_url.group("ws")
+            ws_host = ws_url.group('ws')
+            if ':' in ws_host:
+                ws_host, ws_port = ws_host.split(':')
+            return 'wss://%s' % ws_host
 
     def _get_streams(self):
-        log.debug('Version 2018-08-14')
-        log.info('This is a custom plugin.')
+        log.debug('Version 2018-08-19')
         url_match = _url_re.match(self.url)
         channel = url_match.group('channel')
         log.debug('Channel name: {0}'.format(channel))
@@ -88,3 +90,4 @@ class ShowUp(Plugin):
 
 
 __plugin__ = ShowUp
+
