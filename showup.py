@@ -1,13 +1,8 @@
 import logging
 import random
 import re
+import websocket
 
-try:
-    import websocket
-except ImportError:
-    websocket = None
-
-from streamlink.exceptions import OptionalImportError
 from streamlink.plugin import Plugin
 from streamlink.plugin.api import validate, utils
 from streamlink.stream import RTMPStream
@@ -17,6 +12,7 @@ RANDOM_UID = '%032x' % random.getrandbits(128)
 JSON_UID = u'{"id":0,"value":["%s",""]}'
 JSON_CHANNEL = u'{"id":2,"value":["%s"]}'
 
+_url_re = re.compile(r'https?://(\w+.)?showup\.tv/(?P<channel>[A-Za-z0-9_-]+)')
 _websocket_url_re = re.compile(r'''socket\.connect\(["'](?P<ws>[^"']+)["']\)''')
 _schema = validate.Schema(validate.get('value'))
 
@@ -24,7 +20,9 @@ log = logging.getLogger(__name__)
 
 
 class ShowUp(Plugin):
-    pattern = r'https?://(\w+.)?showup\.tv/(?P<channel>[A-Za-z0-9_-]+)'
+    @classmethod
+    def can_handle_url(cls, url):
+        return _url_re.match(url)
 
     def _get_stream_id(self, channel, ws_url):
         ws = websocket.WebSocket()
@@ -66,10 +64,9 @@ class ShowUp(Plugin):
             return 'wss://%s' % ws_host
 
     def _get_streams(self):
-        if websocket is None:
-            raise OptionalImportError('websocket-client')
-
-        url_match = self.pattern_re.match(self.url)
+        log.debug('Version 2018-08-19')
+        log.info('This is a custom plugin.')
+        url_match = _url_re.match(self.url)
         channel = url_match.group('channel')
         log.debug('Channel name: {0}'.format(channel))
         self.session.http.parse_headers('Referer: %s' % self.url)
@@ -94,5 +91,3 @@ class ShowUp(Plugin):
 
 
 __plugin__ = ShowUp
-
-
