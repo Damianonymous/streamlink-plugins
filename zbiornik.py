@@ -38,7 +38,7 @@ class Zbiornik(Plugin):
 
     def _get_streams(self):
         log.debug('Version 2018-07-12')
-        log.info('This is a custom plugin. '
+        log.info('This is a custom plugin. ')
         channel = self._url_re.match(self.url).group('channel')
         log.info('Channel: {0}'.format(channel))
         self.session.http.headers.update({'User-Agent': useragents.FIREFOX})
