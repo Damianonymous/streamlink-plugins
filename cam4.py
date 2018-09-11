@@ -1,15 +1,15 @@
 import re
 
 from streamlink.plugin import Plugin
-from streamlink.plugin.api import useragents, validate
+from streamlink.plugin.api import http, useragents, validate
 from streamlink.stream import HLSStream, RTMPStream
 from streamlink.utils import parse_json
 
 
 class Cam4(Plugin):
-    pattern = r'https?://([a-z]+\.)?cam4\.com/.+'
-
+    _url_re = re.compile(r'https?://([a-z]+\.)?cam4.com/.+')
     _video_data_re = re.compile(r"flashData: (?P<flash_data>{.*}), hlsUrl: '(?P<hls_url>.+?)'")
+
     _flash_data_schema = validate.Schema(
         validate.all(
             validate.transform(parse_json),
@@ -23,8 +23,12 @@ class Cam4(Plugin):
         )
     )
 
+    @classmethod
+    def can_handle_url(cls, url):
+        return Cam4._url_re.match(url)
+
     def _get_streams(self):
-        res = self.session.http.get(self.url, headers={'User-Agent': useragents.ANDROID})
+        res = http.get(self.url, headers={'User-Agent': useragents.ANDROID})
         match = self._video_data_re.search(res.text)
         if match is None:
             return
