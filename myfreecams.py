@@ -310,7 +310,3 @@ class MyFreeCams(Plugin):
 
 
 __plugin__ = MyFreeCams
-
-
-        
-        
