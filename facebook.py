@@ -1,3 +1,4 @@
+import logging
 import re
 
 from streamlink.plugin import Plugin
@@ -5,16 +6,15 @@ from streamlink.plugin.api import useragents
 from streamlink.stream import DASHStream, HTTPStream
 from streamlink.utils import parse_json
 
+log = logging.getLogger(__name__)
+
 
 class Facebook(Plugin):
-    _url_re = re.compile(r"https?://(?:www\.)?facebook\.com/[^/]+/(posts|videos)")
+    pattern = r'https?://(?:www\.)?facebook\.com/[^/]+/(posts|videos)'
+
     _src_re = re.compile(r'''(sd|hd)_src["']?\s*:\s*(?P<quote>["'])(?P<url>.+?)(?P=quote)''')
     _playlist_re = re.compile(r'''video:\[({url:".+?}\])''')
     _plurl_re = re.compile(r'''url:"(.*?)"''')
-
-    @classmethod
-    def can_handle_url(cls, url):
-        return cls._url_re.match(url)
 
     def _get_streams(self):
         res = self.session.http.get(self.url, headers={"User-Agent": useragents.CHROME})
@@ -33,13 +33,13 @@ class Facebook(Plugin):
                 streams[match.group(1)] = HTTPStream(self.session, stream_url)
                 vod_urls.add(stream_url)
             else:
-                self.logger.debug("Non-dash/mp4 stream: {0}".format(stream_url))
+                log.debug("Non-dash/mp4 stream: {0}".format(stream_url))
 
         if streams:
             return streams
 
         # fallback on to playlist
-        self.logger.debug("Falling back to playlist regex")
+        log.debug("Falling back to playlist regex")
         match = self._playlist_re.search(res.text)
         playlist = match and match.group(1)
         if playlist:
@@ -51,3 +51,4 @@ class Facebook(Plugin):
 
 
 __plugin__ = Facebook
+
