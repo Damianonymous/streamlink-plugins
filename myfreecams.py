@@ -229,7 +229,6 @@ class MyFreeCams(Plugin):
         self.session.http.headers.update({'User-Agent': useragents.FIREFOX})
         log.debug('Version 2018-07-12')
         log.info('This is a custom plugin. '
-                 'For support visit https://github.com/back-to/plugins')
         match = self._url_re.match(self.url)
         username = match.group('username')
         user_id = match.group('user_id')
