@@ -1,11 +1,9 @@
 from __future__ import unicode_literals
-
-import argparse
 import logging
 import re
 
 from streamlink.compat import parse_qsl, is_py2
-from streamlink.plugin import Plugin, PluginError, PluginArguments, PluginArgument
+from streamlink.plugin import Plugin, PluginError
 from streamlink.plugin.api import validate, useragents
 from streamlink.plugin.api.utils import parse_query
 from streamlink.stream import HTTPStream, HLSStream
@@ -77,38 +75,44 @@ _config_schema = validate.Schema(
         ),
         validate.optional("hlsvp"): validate.text,
         validate.optional("live_playback"): validate.transform(bool),
-        validate.optional("reason"): validate.all(validate.text, validate.transform(maybe_decode)),
-        validate.optional("livestream"): validate.text,
-        validate.optional("live_playback"): validate.text,
+        validate.optional("reason"): validate.all(validate.text,
+                                                  validate.transform(maybe_decode)),
         validate.optional("author"): validate.all(validate.text,
                                                   validate.transform(maybe_decode)),
         validate.optional("title"): validate.all(validate.text,
                                                  validate.transform(maybe_decode)),
+        validate.optional("livestream"): validate.text,
+        validate.optional("live_playback"): validate.text,
         "status": validate.text
     }
 )
 
 _ytdata_re = re.compile(r'window\["ytInitialData"\]\s*=\s*({.*?});', re.DOTALL)
-_url_re = re.compile(r"""
-    http(s)?://(\w+\.)?youtube.com
-    (?:
-        (?:
-            /(watch.+v=|embed/|v/)
-            (?P<video_id>[0-9A-z_-]{11})
-        )
-        |
-        (?:
-            /(user|channel)/(?P<user>[^/?]+)
-        )
-        |
-        (?:
-            /(c/)?(?P<liveChannel>[^/?]+)/live
-        )
-    )
-""", re.VERBOSE)
 
 
 class YouTube(Plugin):
+    pattern = r'''(?x)https?://
+        (?:
+        (?:\w+\.)?youtube(?:-nocookie)?\.com
+        (?:
+            (?:
+                /(watch.+v=|embed/|v/)
+                (?P<video_id>[0-9A-z_-]{11})
+            )
+            |
+            (?:
+                /(user|channel)/(?P<user>[^/?]+)
+            )
+            |
+            (?:
+                /(c/)?(?P<liveChannel>[^/?]+)/live
+            )
+        )
+        |
+        youtu\.be/(?P<video_id_2>[0-9A-z_-]{11})
+        )
+    '''
+
     _oembed_url = "https://www.youtube.com/oembed"
     _video_info_url = "https://youtube.com/get_video_info"
 
@@ -143,14 +147,6 @@ class YouTube(Plugin):
         258: 258,
     }
 
-    arguments = PluginArguments(
-        PluginArgument(
-            "api-key",
-            sensitive=True,
-            help=argparse.SUPPRESS  # no longer used
-        )
-    )
-
     def __init__(self, url):
         super(YouTube, self).__init__(url)
         self.author = None
@@ -167,10 +163,6 @@ class YouTube(Plugin):
         if self.title is None:
             self.get_oembed
         return self.title
-
-    @classmethod
-    def can_handle_url(cls, url):
-        return _url_re.match(url)
 
     @classmethod
     def stream_weight(cls, stream):
@@ -247,8 +239,7 @@ class YouTube(Plugin):
         return streams, protected
 
     def _find_video_id(self, url):
-
-        m = _url_re.match(url)
+        m = self.pattern_re.match(url)
         if m.group("video_id"):
             log.debug("Video ID from URL")
             return m.group("video_id")
@@ -356,3 +347,4 @@ class YouTube(Plugin):
 
 
 __plugin__ = YouTube
+
