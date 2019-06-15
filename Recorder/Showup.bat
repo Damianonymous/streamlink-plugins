@@ -35,7 +35,7 @@ IF EXIST "%OUT_DIR%" (ECHO %_FNAME_%) ELSE (MD "%OUT_DIR%"
 ECHO %_FNAME_%)
 ECHO #####################################################
 ECHO.
-STREAMLINK "https://showup.tv/%MODEL%/" best -o "%OUT_DIR%%FILENAME%"
+STREAMLINK "https://showup.tv/%MODEL%" best -o "%OUT_DIR%%FILENAME%"
 
 TIMEOUT 30
 GOTO main
