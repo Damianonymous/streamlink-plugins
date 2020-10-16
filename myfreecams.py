@@ -171,10 +171,10 @@ class MyFreeCams(Plugin):
                     break
 
                 FC = ws_answer.group(1)
-                FCTYPE = int(FC[4:])
+                FCTYPE = int(FC[6:])
 
-                message_length = int(FC[0:4])
-                message = socket_buffer[4:4 + message_length]
+                message_length = int(FC[0:6])
+                message = socket_buffer[6:6 + message_length]
 
                 if len(message) < message_length:
                     buff = ''.join(socket_buffer)
@@ -191,7 +191,7 @@ class MyFreeCams(Plugin):
                 elif FCTYPE == 10:
                     ws_close = 1
 
-                socket_buffer = socket_buffer[4 + message_length:]
+                socket_buffer = socket_buffer[6 + message_length:]
 
                 if len(socket_buffer) == 0:
                     break
