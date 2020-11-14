@@ -1,5 +1,6 @@
 import random
 import re
+import json
 
 from streamlink.plugin import Plugin
 from streamlink.plugin.api import http
@@ -12,10 +13,11 @@ _url_re = re.compile(r"http(s)?://(www\.)?camsoda\.com/(?P<username>[^\"\']+)")
 _api_user_schema = validate.Schema(
     {
         "status": validate.any(int, validate.text),
-        validate.optional("user"): {
-            "online": validate.any(int, validate.text),
-            "chatstatus": validate.text,
-        }
+        validate.optional("user"): validate.Schema({
+            "chat": validate.Schema ({
+                    "status": validate.any(int, validate.text)
+            })
+        })
     }
 )
 
@@ -32,6 +34,7 @@ _api_video_schema = validate.Schema(
 class Camsoda(Plugin):
     API_URL_USER = "https://www.camsoda.com/api/v1/user/{0}"
     API_URL_VIDEO = "https://www.camsoda.com/api/v1/video/vtoken/{0}?username=guest_{1}"
+    HLS_URL_VIDEO_EDGE = "https://{server}/{stream_name}_h264_aac_720p/index.m3u8?token={token}"
     HLS_URL_VIDEO = "https://{server}/{app}/mp4:{stream_name}_aac/playlist.m3u8?token={token}"
     headers = {
         "User-Agent": useragents.FIREFOX
@@ -42,12 +45,14 @@ class Camsoda(Plugin):
         return _url_re.match(url)
 
     def _stream_status(self, data_user):
+#        print(json.dumps(data_user, indent = 4, sort_keys=True))
+
         invalid_username = data_user["status"] is False
         if invalid_username:
             self.logger.info("No validate username found for {0}".format(self.url))
             return
 
-        is_online = data_user["user"]["online"] is True and data_user["user"]["chatstatus"] == "online"
+        is_online = data_user["status"] is True and data_user["user"]["chat"]["status"] == "online"
         if is_online is False:
             self.logger.info("Stream is currently offline or private")
             return
@@ -60,7 +65,7 @@ class Camsoda(Plugin):
         return data_user
 
     def _get_api_video(self, username):
-        res = http.get(self.API_URL_VIDEO.format(username, str(random.randint(1000, 99999))), headers=self.headers)
+        res = http.get(self.API_URL_VIDEO.format(username, str(random.randint(1000, 99999))), headers=self.headers, verify=False)
         data_video = http.json(res, schema=_api_video_schema)
         return data_video
 
@@ -82,11 +87,21 @@ class Camsoda(Plugin):
                     stream_name=data_video["stream_name"],
                     token=data_video["token"]
                 )
+                if "edge" in data_video["edge_servers"][0]:
+                    self.session.http.verify = False
+                    hls_url = self.HLS_URL_VIDEO_EDGE.format(
+                    	server=data_video["edge_servers"][0],
+                    	stream_name=data_video["stream_name"],
+                    	token=data_video["token"]
+                    )
 
                 for s in HLSStream.parse_variant_playlist(self.session, hls_url).items():
                     yield s
 
 
 __plugin__ = Camsoda
+
+
+
 
 
