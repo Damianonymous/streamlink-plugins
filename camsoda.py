@@ -24,7 +24,7 @@ _api_user_schema = validate.Schema(
 _api_video_schema = validate.Schema(
     {
         "token": validate.text,
-        "app": validate.text,
+        #"app": validate.text,
         "edge_servers": [validate.text],
         "stream_name": validate.text
     }
@@ -35,7 +35,7 @@ class Camsoda(Plugin):
     API_URL_USER = "https://www.camsoda.com/api/v1/user/{0}"
     API_URL_VIDEO = "https://www.camsoda.com/api/v1/video/vtoken/{0}?username=guest_{1}"
     HLS_URL_VIDEO_EDGE = "https://{server}/{stream_name}_h264_aac_720p/index.m3u8?token={token}"
-    HLS_URL_VIDEO = "https://{server}/{app}/mp4:{stream_name}_aac/playlist.m3u8?token={token}"
+    HLS_URL_VIDEO = "https://{server}/mp4:{stream_name}_aac/playlist.m3u8?token={token}"
     headers = {
         "User-Agent": useragents.FIREFOX
     }
@@ -83,7 +83,7 @@ class Camsoda(Plugin):
             if data_video:
                 hls_url = self.HLS_URL_VIDEO.format(
                     server=data_video["edge_servers"][0],
-                    app=data_video["app"],
+                    #app=data_video["app"],
                     stream_name=data_video["stream_name"],
                     token=data_video["token"]
                 )
