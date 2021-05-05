@@ -1,0 +1,5 @@
+1. Set and use models' prefered hours. (wait time lower during, higher outside);
+2. Combine all in one cmd batch and one models list;
+3. Better handling errors;
+4. Automatic start and stop for a model;
+5. When model is in private enter in spy mode.
