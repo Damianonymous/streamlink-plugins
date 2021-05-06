@@ -7,8 +7,7 @@ They are based on the Showup.bat recorder made by Damianonymous:
 https://github.com/Damianonymous/streamlink-plugins/tree/master/Recorder
 
 But with some improvements:
-- the files/folders used by the recorders are searched and used in the folder where Recorder-*.cmd is started.
-This way it is now truly portable.
+- the files/folders used by the recorders are searched and used in the folder where Recorder_*.cmd is started.This way it is now truly portable.
 - the title of the command/cmd window shows the status of the recorder:
 Select model
 Name of the model (when is waiting between Streamlink attempts).
@@ -18,11 +17,11 @@ Name of the model written in uppercase - when it tries to connect and when is su
 
 Usage:
 
-Download Recorder_*.cmd and *_Model.txt (same string for * on both).
+Download Recorder_\*.cmd and \*\_Model.txt (same string for \* on both).
 Download Streamlink_portable.zip and Streamlink_portable.z01 into the same folder.
 Then decompress Streamlink_portable.zip into the same folder where you downloaded/copied Recorder_*.cmd.
-Populate the *_Model.txt text file with the models names (only lowercase)..
-Start Recorder_*.cmd, chose model by index and hit Enter/Return. And repeat.
+Populate the \*\_Model.txt text file with the models names (only lowercase)..
+Start Recorder_\*.cmd, choose model by index and hit Enter/Return. And repeat.
 
 Useful information: the time interval between attempts was calculated for an average PC/Laptop, for an average internet connection and for 5..10 sessions.
 For other characteristics you may need to increase it.
