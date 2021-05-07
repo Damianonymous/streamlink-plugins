@@ -1,5 +1,15 @@
 @ECHO OFF
 SETLOCAL EnableDelayedExpansion
+TITLE Checking for streamlink:
+if not exist "%~dp1Streamlink_Portable\Streamlink.exe" (
+  ECHO.
+  ECHO Could not find the Streamlink_Portable\streamlink.exe file !
+  ECHO Please download and decompress
+  ECHO Streamlink_Portable.zip and Streamlink_Portable.z01
+  ECHO.
+  TIMEOUT 20
+  GOTO endmain
+)
 TITLE Select model:
 :START
 ECHO.
@@ -50,4 +60,5 @@ IF EXIST "%OUT_DIR%%FILENAME%" (
 
 TIMEOUT %WTIME%
 GOTO main
+:endmain
 ENDLOCAL
