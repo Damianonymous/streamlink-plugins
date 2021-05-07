@@ -1,6 +1,6 @@
-1. Set and use models' preferred hours. (wait time between attempts will be lower during and higher outside);
-2. Combine all in one cmd batch and one models list;
-3. Better handling errors;
-4. Automatic start and stop for a model;
-5. When model is in private enter in spy mode.
-6. When it starts recording to notify the user by audio and/or by bringing the cmd window in front and so on.
+Set and use models' preferred hours. (wait time between attempts will be lower during and higher outside);
+Combine all in one cmd batch and one models list;
+Better handling errors;
+Automatic start and stop for a model at specific time;
+When model is in private enter in spy mode (payed). But I think that should be implemented in Streamlink or in Streamlink plugins.
+When it starts recording to notify the user by audio and/or by bringing the cmd window in front and so on. But that should be implemented in Streamlink or in Streamlink plugins, because Streamlink has full control when it starts downloading the stream.
