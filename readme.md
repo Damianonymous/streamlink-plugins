@@ -19,6 +19,8 @@ Name of the model (when is waiting between Streamlink attempts).
 Name of the model written in uppercase - when it tries to connect and when is succeeding.
 - the time interval between attempts is no longer a fixed value, it is randomly chosen between 45 and 75 seconds.
 - if something was recorded during an attempt the next attempt will be started in 22..37 seconds.
+Why a random value and not a fixed value: because, when you start multiple sessions, they tend to syncronize all together and then spam the site.
+In a few minutes the site will temporary block your connection.
 
 Usage:
 
@@ -31,7 +33,6 @@ Usage:
 Useful informations:
 - the time interval between attempts was calculated for an average PC/Laptop, for an average internet connection and for 5..10 sessions.
 For other characteristics you may need to increase/decrease it.
-Why a random value and not a fixed value: because, when you start multiple sessions, they tend to syncronize all together and then spam the site. In a few minutes the site will temporary block your connection.
 - at the end of each of the Recorder_\*.cmd files you'll find a string looking like this "720p_alt,720p,best". Here you can set the video quality of the recording. 720p and 1080p are preffered; "best" automatically chooses the highest value but it isn't always preffered...
 
 Have fun :)
