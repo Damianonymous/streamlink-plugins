@@ -4,3 +4,4 @@ Better handling errors;
 Automatic start and stop for a model at specific time;
 When model is in private enter in spy mode (payed). But I think that should be implemented in Streamlink or in Streamlink plugins.
 When it starts recording to notify the user by audio and/or by bringing the cmd window in front and so on. But that should be implemented in Streamlink or in Streamlink plugins, because Streamlink has full control when it starts downloading the stream.
+Add an entry to the context menu of the default browser to add the model under the mouse cursor.
