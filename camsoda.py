@@ -24,7 +24,6 @@ _api_user_schema = validate.Schema(
 _api_video_schema = validate.Schema(
     {
         "token": validate.text,
-        "app": validate.text,
         "edge_servers": [validate.text],
         "stream_name": validate.text
     }
@@ -32,10 +31,9 @@ _api_video_schema = validate.Schema(
 
 
 class Camsoda(Plugin):
-    API_URL_USER = "https://www.camsoda.com/api/v1/user/{0}"
     API_URL_VIDEO = "https://www.camsoda.com/api/v1/video/vtoken/{0}?username=guest_{1}"
-    HLS_URL_VIDEO_EDGE = "https://{server}/{stream_name}_h264_aac_720p/index.m3u8?token={token}"
-    HLS_URL_VIDEO = "https://{server}/{app}/mp4:{stream_name}_aac/playlist.m3u8?token={token}"
+    HLS_URL_VIDEO_EDGE = "https://{server}/{stream_name}_h264_opus_720p/index.m3u8?token={token}"
+    HLS_URL_VIDEO = "https://{server}/mp4:{stream_name}_aac/playlist.m3u8?token={token}"
     headers = {
         "User-Agent": useragents.FIREFOX
     }
@@ -45,7 +43,6 @@ class Camsoda(Plugin):
         return _url_re.match(url)
 
     def _stream_status(self, data_user):
-#        print(json.dumps(data_user, indent = 4, sort_keys=True))
 
         invalid_username = data_user["status"] is False
         if invalid_username:
@@ -59,11 +56,6 @@ class Camsoda(Plugin):
 
         return True
 
-    def _get_api_user(self, username):
-        res = http.get(self.API_URL_USER.format(username), headers=self.headers)
-        data_user = http.json(res, schema=_api_user_schema)
-        return data_user
-
     def _get_api_video(self, username):
         res = http.get(self.API_URL_VIDEO.format(username, str(random.randint(1000, 99999))), headers=self.headers, verify=False)
         data_video = http.json(res, schema=_api_video_schema)
@@ -74,29 +66,24 @@ class Camsoda(Plugin):
         username = match.group("username")
         username = username.replace("/", "")
 
-        data_user = self._get_api_user(username)
-        stream_status = self._stream_status(data_user)
+        data_video = self._get_api_video(username)
 
-        if stream_status:
-            data_video = self._get_api_video(username)
-
-            if data_video:
-                hls_url = self.HLS_URL_VIDEO.format(
+        if data_video["edge_servers"]:
+            hls_url = self.HLS_URL_VIDEO.format(
+                server=data_video["edge_servers"][0],
+                stream_name=data_video["stream_name"],
+                token=data_video["token"]
+            )
+            if "edge" in data_video["edge_servers"][0]:
+                self.session.http.verify = False
+                hls_url = self.HLS_URL_VIDEO_EDGE.format(
                     server=data_video["edge_servers"][0],
-                    app=data_video["app"],
                     stream_name=data_video["stream_name"],
                     token=data_video["token"]
                 )
-                if "edge" in data_video["edge_servers"][0]:
-                    self.session.http.verify = False
-                    hls_url = self.HLS_URL_VIDEO_EDGE.format(
-                    	server=data_video["edge_servers"][0],
-                    	stream_name=data_video["stream_name"],
-                    	token=data_video["token"]
-                    )
 
-                for s in HLSStream.parse_variant_playlist(self.session, hls_url).items():
-                    yield s
+            for s in HLSStream.parse_variant_playlist(self.session, hls_url).items():
+                yield s
 
 
 __plugin__ = Camsoda
