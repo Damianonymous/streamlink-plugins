@@ -32,7 +32,7 @@ _api_video_schema = validate.Schema(
 
 class Camsoda(Plugin):
     API_URL_VIDEO = "https://www.camsoda.com/api/v1/video/vtoken/{0}?username=guest_{1}"
-    HLS_URL_VIDEO_EDGE = "https://{server}/{stream_name}_h264_opus_720p/index.m3u8?token={token}"
+    HLS_URL_VIDEO_EDGE = "https://{server}/{stream_name}_h264_aac_720p/index.m3u8?token={token}"
     HLS_URL_VIDEO = "https://{server}/mp4:{stream_name}_aac/playlist.m3u8?token={token}"
     headers = {
         "User-Agent": useragents.FIREFOX
@@ -87,8 +87,3 @@ class Camsoda(Plugin):
 
 
 __plugin__ = Camsoda
-
-
-
-
-
