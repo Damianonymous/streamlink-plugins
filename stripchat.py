@@ -4,7 +4,7 @@ from streamlink.plugin import Plugin
 from streamlink.plugin.api import validate
 from streamlink.stream import HLSStream
 
-_url_re = re.compile(r"https?://(\w+\.)?stripchat\.com/(?P<username>\w+)")
+_url_re = re.compile(r"https?://(\w+\.)?stripchat\.com/(?P<username>[\w\d_-]+)")
 
 _post_schema = validate.Schema(
     {
