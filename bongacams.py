@@ -1,33 +1,24 @@
 import json
 import re
 
-from streamlink.compat import urljoin, urlparse, urlunparse
+import requests
+
+from urllib.parse import urljoin, urlparse, urlunparse
 from streamlink.exceptions import PluginError, NoStreamsError
-from streamlink.plugin.api import validate, http, useragents
+from streamlink.plugin.api import validate, useragents
 from streamlink.plugin import Plugin
 from streamlink.stream import HLSStream
 from streamlink.utils import update_scheme
 
-CONST_AMF_GATEWAY_LOCATION = '/tools/amf.php'
-CONST_AMF_GATEWAY_PARAM = 'x-country'
-CONST_DEFAULT_COUNTRY_CODE = 'en'
 
 CONST_HEADERS = {}
 CONST_HEADERS['User-Agent'] = useragents.CHROME
+CONST_HEADERS['X-Requested-With'] = 'XMLHttpRequest'
 
-url_re = re.compile(r"(http(s)?://)?(\w{2}.)?(bongacams\.com)/([\w\d_-]+)")
+url_re = re.compile(r"(http(s)?://)?(\w{2}.)?(bongacams\d*?\.com)/([\w\d_-]+)")
 
-amf_msg_schema = validate.Schema({
-    "status": "success",
-    "userData": {
-        "username": validate.text
-    },
-    "localData": {
-        "videoServerUrl": validate.text
-    },
-    "performerData": {
-        "username": validate.text,
-    }
+schema = validate.Schema({
+    "status": "success"
 })
 
 
@@ -39,79 +30,74 @@ class bongacams(Plugin):
     def _get_streams(self):
         match = url_re.match(self.url)
 
+        LISTING_PATH = 'tools/listing_v3.php'
+
         stream_page_scheme = 'https'
         stream_page_domain = match.group(4)
-        stream_page_path = match.group(5)
-        country_code = CONST_DEFAULT_COUNTRY_CODE
+        model_name = match.group(5)
+
+        listing_url = urlunparse((stream_page_scheme, stream_page_domain, LISTING_PATH, '', '', ''))
 
         # create http session and set headers
-        http_session = http
+        http_session = self.session.http
         http_session.headers.update(CONST_HEADERS)
-
-        # get cookies
-        r = http_session.get(urlunparse((stream_page_scheme, stream_page_domain, stream_page_path, '', '', '')))
-
-        # redirect to profile page means stream is offline
-        if '/profile/' in r.url:
-            raise NoStreamsError(self.url)
-        if not r.ok:
-            self.logger.debug("Status code for {0}: {1}", r.url, r.status_code)
-            raise NoStreamsError(self.url)
-        if len(http_session.cookies) == 0:
-            raise PluginError("Can't get a cookies")
-
-        if urlparse(r.url).netloc != stream_page_domain:
-            # then redirected to regional subdomain
-            country_code = urlparse(r.url).netloc.split('.')[0].lower()
-
-        # time to set variables
-        baseurl = urlunparse((stream_page_scheme, urlparse(r.url).netloc, '', '', '', ''))
-        amf_gateway_url = urljoin(baseurl, CONST_AMF_GATEWAY_LOCATION)
-        stream_page_url = urljoin(baseurl, stream_page_path)
-
-        headers = {
-            'User-Agent': useragents.CHROME,
-            'Referer': stream_page_url,
-            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-            'X-Requested-With': 'XMLHttpRequest'
+        
+        params = {
+            "livetab": None,
+            "online_only": True,
+            "offset": 0,
+            "model_search[display_name][text]": model_name,
+            "_online_filter": 0,
+            "can_pin_models": False,
+            "limit": 1
         }
 
-        data = 'method=getRoomData&args%5B%5D={0}&args%5B%5D=false'.format(stream_page_path)
-        self.logger.debug('DATA: {0}'.format(str(data)))
-        # send request and close http-session
-        r = http_session.post(url=amf_gateway_url,
-                              headers=headers,
-                              params={CONST_AMF_GATEWAY_PARAM: country_code},
-                              data=data)
+        response = http_session.get(listing_url, params=params)
+
+        self.logger.debug(response.text)
+
+        if len(http_session.cookies) == 0:
+            raise PluginError("Can't get a cookies")
+        if response.status_code != 200:
+            self.logger.debug("response for {0}:\n{1}".format(response.request.url, response.text))
+            raise PluginError("unexpected status code for {0}: {1}".format(response.url, response.status_code))
+
         http_session.close()
+        response = response.json()
+        schema.validate(response)
 
-        if r.status_code != 200:
-            raise PluginError("unexpected status code for {0}: {1}", r.url, r.status_code)
+        if not model_name.lower() in list([model['username'].lower() for model in response['models']]):
+            raise NoStreamsError(self.url)
+        if str(response['online_count']) == '0':
+            raise NoStreamsError(self.url)
 
-        stream_source_info = amf_msg_schema.validate(json.loads(r.text))
-        self.logger.debug("source stream info:\n{0}", stream_source_info)
+        esid = None
+        for model in response['models']:
+            if model['username'].lower() == model_name.lower():
+                #if model['room'] not in ('public', 'private', 'fullprivate'):
+                #    raise NoStreamsError(self.url)
+                esid = model.get('esid')
+                model_name = model['username']
 
-        if not stream_source_info:
-            return
+        if not esid:
+            raise PluginError("unknown error, esid={0} for {1}.\nResponse: {2}".format(esid, model_name, response['models']))
 
-        urlnoproto = stream_source_info['localData']['videoServerUrl']
-        urlnoproto = update_scheme('https://', urlnoproto)
-        performer = stream_source_info['performerData']['username']
-
-        hls_url = '{0}/hls/stream_{1}/playlist.m3u8'.format(urlnoproto, performer)
+        hls_url = f'https://{esid}.bcvcdn.com/hls/stream_{model_name}/playlist.m3u8'
 
         if hls_url:
             self.logger.debug('HLS URL: {0}'.format(hls_url))
             try:
-                for s in HLSStream.parse_variant_playlist(self.session, hls_url, headers=headers).items():
+                for s in HLSStream.parse_variant_playlist(self.session, hls_url).items():
                     yield s
             except Exception as e:
                 if '404' in str(e):
-                    self.logger.error('Stream is currently offline or private')
+                    self.logger.debug(str(e))
+                    self.logger.debug('Stream is currently offline/private/away')
                 else:
                     self.logger.error(str(e))
                 return
 
 
 __plugin__ = bongacams
+
 
