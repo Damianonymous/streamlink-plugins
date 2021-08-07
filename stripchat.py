@@ -4,7 +4,7 @@ from streamlink.plugin import Plugin
 from streamlink.plugin.api import validate
 from streamlink.stream import HLSStream
 
-_url_re = re.compile(r"https?://(\w+\.)?stripchat\.com/(?P<username>[\w\d_-]+)")
+_url_re = re.compile(r"https?://(\w+\.)?stripchat\.com/(?P<username>[a-zA-Z0-9_-]+)")
 
 _post_schema = validate.Schema(
     {
@@ -42,11 +42,16 @@ class Stripchat(Plugin):
 
         server = "https://b-{0}.strpst.com/hls/{1}/master_{1}.m3u8".format(data["cam"]["viewServers"]["flashphoner-hls"],data["cam"]["streamName"])
 
+        server0 = "https://b-{0}.strpst.com/hls/{1}/{1}.m3u8".format(data["cam"]["viewServers"]["flashphoner-hls"],data["cam"]["streamName"])
+
         self.logger.info("Stream status: {0}".format(data["user"]["user"]["status"]))
 
         if (data["user"]["user"]["isLive"] is True and data["user"]["user"]["status"] == "public" and server):
-            for s in HLSStream.parse_variant_playlist(self.session,server,headers={'Referer': self.url}).items():
-                yield s
-
+            try:
+                for s in HLSStream.parse_variant_playlist(self.session,server,headers={'Referer': self.url}).items():
+                    yield s
+            except IOError as err:
+                stream = HLSStream(self.session, server0)
+                yield "Auto", stream
 
 __plugin__ = Stripchat
