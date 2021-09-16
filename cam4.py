@@ -1,53 +1,50 @@
 import re
 
 from streamlink.plugin import Plugin
-from streamlink.plugin.api import http, useragents, validate
-from streamlink.stream import HLSStream, RTMPStream
-from streamlink.utils import parse_json
+from streamlink.plugin.api import validate
+from streamlink.stream import HLSStream
+from datetime import datetime
 
+STREAM_INFO = "https://www.cam4.com/rest/v1.0/profile/{0}/streamInfo"
+INFO_URL = "https://www.cam4.com/rest/v1.0/search/performer/{0}"
+PROFILE_URL = "https://www.cam4.com/rest/v1.0/profile/{0}/info"
+
+_url_re = re.compile(r"https?://(\w+\.)?cam4\.com/(?P<username>\w+)")
 
 class Cam4(Plugin):
-    _url_re = re.compile(r'https?://([a-z]+\.)?cam4.com/.+')
-    _video_data_re = re.compile(r"flashData: (?P<flash_data>{.*}), hlsUrl: '(?P<hls_url>.+?)'")
-
-    _flash_data_schema = validate.Schema(
-        validate.all(
-            validate.transform(parse_json),
-            validate.Schema({
-                'playerUrl': validate.url(),
-                'flashVars': validate.Schema({
-                    'videoPlayUrl': validate.text,
-                    'videoAppUrl': validate.url(scheme='rtmp')
-                })
-            })
-        )
-    )
-
     @classmethod
     def can_handle_url(cls, url):
-        return Cam4._url_re.match(url)
+        return _url_re.match(url)
 
     def _get_streams(self):
-        res = http.get(self.url, headers={'User-Agent': useragents.ANDROID})
-        match = self._video_data_re.search(res.text)
-        if match is None:
-            return
+        match = _url_re.match(self.url)
+        username = match.group("username")
 
-        hls_streams = HLSStream.parse_variant_playlist(
-            self.session,
-            match.group('hls_url'),
-            headers={'Referer': self.url}
-        )
-        for s in hls_streams.items():
-            yield s
+        res = self.session.http.get(INFO_URL.format(username))
+        data = self.session.http.json(res)
 
-        rtmp_video = self._flash_data_schema.validate(match.group('flash_data'))
-        rtmp_stream = RTMPStream(self.session, {
-            'rtmp': rtmp_video['flashVars']['videoAppUrl'],
-            'playpath': rtmp_video['flashVars']['videoPlayUrl'],
-            'swfUrl': rtmp_video['playerUrl']
-        })
-        yield 'live', rtmp_stream
+        online = data["online"]
+        self.logger.info("Stream status: {0}".format("online" if online else "offline"))
+        if online:
+            self.logger.info("Country: {0}".format(data["country"]))
+            res = self.session.http.get(PROFILE_URL.format(username))
+            data = self.session.http.json(res)
+            self.logger.info("City: {0}".format(data["city"]))
+            self.logger.info("Body Hair: {0}".format(data["bodyHair"]))
+            self.logger.info("Main Language: {0}".format(data["mainLanguage"]))
+            self.logger.info("Breast Size: {0}".format(data["breastSize"]))
+            self.logger.info("Birthdate: {0}".format(data["birthdate"]))
+            self.logger.info("Age: {0}".format(int((datetime.now() - datetime.strptime(data["birthdate"], "%Y-%m-%d")).days / 365)))
 
+            res = self.session.http.get(STREAM_INFO.format(username))
+            data = self.session.http.json(res)
+            if data["canUseCDN"]:
+                sStreamURL = data["cdnURL"]
+                self.logger.debug("Playlist URL : {0}".format(sStreamURL))
+                for s in HLSStream.parse_variant_playlist(self.session, sStreamURL).items():
+                    self.logger.debug("HLS Stream: {0}".format(s))
+                    yield s
+            else:
+                self.logger.info("Access: private")
 
 __plugin__ = Cam4
