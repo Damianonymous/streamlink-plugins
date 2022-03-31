@@ -2,8 +2,8 @@ import logging
 import random
 import re
 import uuid
+import urllib.parse
 
-from streamlink.compat import unquote
 from streamlink.exceptions import NoStreamsError, PluginError
 from streamlink.plugin import Plugin, PluginArgument, PluginArguments
 from streamlink.plugin.api import useragents, validate
@@ -180,7 +180,7 @@ class MyFreeCams(Plugin):
                     buff = ''.join(socket_buffer)
                     break
 
-                message = unquote(message)
+                message = urllib.parse.unquote(message, encoding='utf-8', errors='replace')
 
                 if FCTYPE == 1 and username:
                     ws.send('10 0 0 20 0 {0}\n'.format(username))
