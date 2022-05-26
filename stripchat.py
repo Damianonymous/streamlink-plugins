@@ -40,9 +40,9 @@ class Stripchat(Plugin):
         res = self.session.http.get(api_call, headers=headers)
         data = self.session.http.json(res, schema=_post_schema)
 
-        server = "https://b-{0}.strpst.com/hls/{1}/master_{1}.m3u8".format(data["cam"]["viewServers"]["flashphoner-hls"],data["cam"]["streamName"])
+        server = "https://b-{0}.doppiocdn.com/hls/{1}/master_{1}.m3u8".format(data["cam"]["viewServers"]["flashphoner-hls"],data["cam"]["streamName"])
 
-        server0 = "https://b-{0}.strpst.com/hls/{1}/{1}.m3u8".format(data["cam"]["viewServers"]["flashphoner-hls"],data["cam"]["streamName"])
+        server0 = "https://b-{0}.doppiocdn.com/hls/{1}/{1}.m3u8".format(data["cam"]["viewServers"]["flashphoner-hls"],data["cam"]["streamName"])
 
         self.logger.info("Stream status: {0}".format(data["user"]["user"]["status"]))
 
