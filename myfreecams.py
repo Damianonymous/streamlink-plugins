@@ -1,20 +1,31 @@
 import logging
 import random
 import re
+
 import uuid
 
-from streamlink.compat import unquote
+from urllib.parse import unquote
 from streamlink.exceptions import NoStreamsError, PluginError
 from streamlink.plugin import Plugin, PluginArgument, PluginArguments
+from streamlink.plugin import pluginmatcher
 from streamlink.plugin.api import useragents, validate
-from streamlink.stream import DASHStream, HLSStream
+from streamlink.stream.dash import DASHStream
+from streamlink.stream.hls import HLSStream
 from streamlink.utils import parse_json
 
 from websocket import create_connection
 
 log = logging.getLogger(__name__)
 
+_url_re = re.compile(r'''https?://(?:\w+\.)?myfreecams\.com/
+    (?:
+        (?:models/)?\#?(?P<username>\w+)
+        |
+        \?id=(?P<user_id>\d+)
+    )''', re.VERBOSE)
 
+
+@pluginmatcher(_url_re)
 class MyFreeCams(Plugin):
     '''Streamlink Plugin for MyFreeCams
 
@@ -31,18 +42,12 @@ class MyFreeCams(Plugin):
     JS_SERVER_URL = 'https://www.myfreecams.com/_js/serverconfig.js'
     PHP_URL = 'https://www.myfreecams.com/php/FcwExtResp.php?respkey={respkey}&type={type}&opts={opts}&serv={serv}'
 
-    _url_re = re.compile(r'''https?://(?:\w+\.)?myfreecams\.com/
-        (?:
-            (?:models/)?\#?(?P<username>\w+)
-            |
-            \?id=(?P<user_id>\d+)
-        )''', re.VERBOSE)
     _dict_re = re.compile(r'''(?P<data>{.*})''')
     _socket_re = re.compile(r'''(\w+) (\w+) (\w+) (\w+) (\w+)''')
 
     _data_schema = validate.Schema(
         {
-            'nm': validate.text,
+            'nm': str,
             'sid': int,
             'uid': int,
             'vs': int,
@@ -65,10 +70,6 @@ class MyFreeCams(Plugin):
             '''
         )
     )
-
-    @classmethod
-    def can_handle_url(cls, url):
-        return cls._url_re.match(url) is not None
 
     def _php_fallback(self, username, user_id, php_message):
         '''Use the php website as a fallback when
@@ -229,9 +230,8 @@ class MyFreeCams(Plugin):
         self.session.http.headers.update({'User-Agent': useragents.FIREFOX})
         log.debug('Version 2018-07-12')
         log.info('This is a custom plugin. ')
-        match = self._url_re.match(self.url)
-        username = match.group('username')
-        user_id = match.group('user_id')
+        username = self.match.group('username')
+        user_id = self.match.group('user_id')
 
         servers = self._get_servers()
         chat_servers = servers['chat_servers']
