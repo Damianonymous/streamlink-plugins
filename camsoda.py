@@ -1,12 +1,16 @@
 import random
 import re
 import json
+import requests
 
 from streamlink.plugin import Plugin
-from streamlink.plugin.api import http
+# from streamlink.plugin.api import http
 from streamlink.plugin.api import validate
 from streamlink.plugin.api import useragents
 from streamlink.stream import HLSStream
+
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 _url_re = re.compile(r"http(s)?://(www\.)?camsoda\.com/(?P<username>[^\"\']+)")
 
@@ -57,8 +61,9 @@ class Camsoda(Plugin):
         return True
 
     def _get_api_video(self, username):
-        res = http.get(self.API_URL_VIDEO.format(username, str(random.randint(1000, 99999))), headers=self.headers, verify=False)
-        data_video = http.json(res, schema=_api_video_schema)
+        res = requests.get(self.API_URL_VIDEO.format(username, str(random.randint(1000, 99999))), headers=self.headers, verify=False)
+        data_video = self.session.http.json(res, _api_video_schema)
+#        data_video = json.loads(str(res.json()), schema=_api_video_schema)
         return data_video
 
     def _get_streams(self):
